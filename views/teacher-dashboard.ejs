@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teacher Dashboard - Booking System</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header class="dashboard-header">
+            <div class="header-content">
+                <h1>Teacher Dashboard</h1>
+                <div class="user-info">
+                    <span>Welcome, <%= user.name %> (<%= user.subject %>)</span>
+                    <form action="/auth/logout" method="POST" style="display: inline;">
+                        <button type="submit" class="btn btn-outline btn-sm">Logout</button>
+                    </form>
+                </div>
+            </div>
+        </header>
+        
+        <main class="dashboard-main">
+            <div class="dashboard-section">
+                <div class="section-header">
+                    <h2>Appointment Requests</h2>
+                    <div id="notification-badge" class="notification-badge" style="display: none;"></div>
+                </div>
+                
+                <div class="appointments-container">
+                    <% if (appointments.length > 0) { %>
+                        <div class="appointments-table">
+                            <div class="table-header">
+                                <div>Student</div>
+                                <div>Email</div>
+                                <div>Date & Time</div>
+                                <div>Note</div>
+                                <div>Status</div>
+                                <div>Actions</div>
+                            </div>
+                            <% appointments.forEach(appointment => { %>
+                                <div class="table-row" id="appointment-<%= appointment._id %>">
+                                    <div><%= appointment.studentId.name %></div>
+                                    <div><%= appointment.studentId.email %></div>
+                                    <div>
+                                        <%= new Date(appointment.date).toLocaleDateString() %><br>
+                                        <span class="time"><%= appointment.time %></span>
+                                    </div>
+                                    <div class="note-cell"><%= appointment.note %></div>
+                                    <div>
+                                        <span class="status status-<%= appointment.status %>">
+                                            <%= appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1) %>
+                                        </span>
+                                    </div>
+                                    <div class="actions-cell">
+                                        <% if (appointment.status === 'pending') { %>
+                                            <button onclick="updateAppointmentStatus('<%= appointment._id %>', 'accepted')" 
+                                                    class="btn btn-success btn-sm">Accept</button>
+                                            <button onclick="updateAppointmentStatus('<%= appointment._id %>', 'declined')" 
+                                                    class="btn btn-danger btn-sm">Decline</button>
+                                        <% } else { %>
+                                            <span class="text-muted">—</span>
+                                        <% } %>
+                                    </div>
+                                </div>
+                            <% }); %>
+                        </div>
+                    <% } else { %>
+                        <div class="empty-state">
+                            <p>No appointment requests yet. Students will be able to book appointments with you.</p>
+                        </div>
+                    <% } %>
+                </div>
+                
+                <div id="realtime-appointments"></div>
+            </div>
+        </main>
+    </div>
+    
+    <!-- Notification Toast -->
+    <div id="notification-toast" class="notification-toast">
+        <div class="toast-content">
+            <strong>New Appointment Request!</strong>
+            <p id="toast-message"></p>
+        </div>
+        <button onclick="closeToast()" class="toast-close">&times;</button>
+    </div>
+    
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const teacherId = '<%= user._id %>';
+        
+        // Join teacher room for real-time updates
+        socket.emit('join-teacher-room', teacherId);
+        
+        // Listen for new appointment requests
+        socket.on('new-appointment-request', (data) => {
+            showNotificationToast(data);
+            addNewAppointmentToTable(data.appointment);
+        });
+        
+        function showNotificationToast(data) {
+            const toast = document.getElementById('notification-toast');
+            const message = document.getElementById('toast-message');
+            message.textContent = `${data.student.name} requested an appointment for ${new Date(data.appointment.date).toLocaleDateString()} at ${data.appointment.time}`;
+            
+            toast.classList.add('show');
+            setTimeout(() => {
+                closeToast();
+            }, 5000);
+        }
+        
+        function closeToast() {
+            document.getElementById('notification-toast').classList.remove('show');
+        }
+        
+        function addNewAppointmentToTable(appointment) {
+            // Add new appointment to the table dynamically
+            const appointmentsTable = document.querySelector('.appointments-table');
+            if (appointmentsTable) {
+                const newRow = document.createElement('div');
+                newRow.className = 'table-row new-appointment';
+                newRow.id = `appointment-${appointment._id}`;
+                newRow.innerHTML = `
+                    <div>${appointment.studentId.name}</div>
+                    <div>${appointment.studentId.email}</div>
+                    <div>
+                        ${new Date(appointment.date).toLocaleDateString()}<br>
+                        <span class="time">${appointment.time}</span>
+                    </div>
+                    <div class="note-cell">${appointment.note}</div>
+                    <div>
+                        <span class="status status-pending">Pending</span>
+                    </div>
+                    <div class="actions-cell">
+                        <button onclick="updateAppointmentStatus('${appointment._id}', 'accepted')" 
+                                class="btn btn-success btn-sm">Accept</button>
+                        <button onclick="updateAppointmentStatus('${appointment._id}', 'declined')" 
+                                class="btn btn-danger btn-sm">Decline</button>
+                    </div>
+                `;
+                appointmentsTable.appendChild(newRow);
+                
+                // Remove new appointment highlighting after animation
+                setTimeout(() => {
+                    newRow.classList.remove('new-appointment');
+                }, 3000);
+            }
+        }
+        
+        async function updateAppointmentStatus(appointmentId, status) {
+            try {
+                const response = await fetch(`/teacher/appointment/${appointmentId}/status`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ status })
+                });
+                
+                if (response.ok) {
+                    // Update the UI
+                    const row = document.getElementById(`appointment-${appointmentId}`);
+                    const statusCell = row.querySelector('.status');
+                    const actionsCell = row.querySelector('.actions-cell');
+                    
+                    statusCell.className = `status status-${status}`;
+                    statusCell.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+                    actionsCell.innerHTML = '<span class="text-muted">—</span>';
+                } else {
+                    alert('Failed to update appointment status');
+                }
+            } catch (error) {
+                console.error('Error updating appointment:', error);
+                alert('Failed to update appointment status');
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Dashboard - Booking System</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header class="dashboard-header">
+            <div class="header-content">
+                <h1>Student Dashboard</h1>
+                <div class="user-info">
+                    <span>Welcome, <%= user.name %></span>
+                    <form action="/auth/logout" method="POST" style="display: inline;">
+                        <button type="submit" class="btn btn-outline btn-sm">Logout</button>
+                    </form>
+                </div>
+            </div>
+        </header>
+        
+        <main class="dashboard-main">
+            <div class="dashboard-section">
+                <h2>Available Teachers</h2>
+                <div class="teachers-grid">
+                    <% teachers.forEach(teacher => { %>
+                        <div class="teacher-card">
+                            <div class="teacher-info">
+                                <h3><%= teacher.name %></h3>
+                                <p class="subject"><%= teacher.subject %></p>
+                            </div>
+                            <button onclick="openBookingModal('<%= teacher._id %>', '<%= teacher.name %>', '<%= teacher.subject %>')" 
+                                    class="btn btn-primary btn-sm">Book Appointment</button>
+                        </div>
+                    <% }); %>
+                </div>
+            </div>
+            
+            <div class="dashboard-section">
+                <h2>My Appointments</h2>
+                <div class="appointments-container">
+                    <% if (appointments.length > 0) { %>
+                        <div class="appointments-table">
+                            <div class="table-header">
+                                <div>Teacher</div>
+                                <div>Subject</div>
+                                <div>Date & Time</div>
+                                <div>Status</div>
+                                <div>Note</div>
+                            </div>
+                        
+                            <% appointments.forEach(appointment => { %>
+                                <div class="table-row">
+                                    <div><%= appointment.teacherId.name %></div>
+                                    <div><%= appointment.teacherId.name %></div>
+                                    <div><%= appointment.teacherId.subject %></div>
+                                    <div>
+                                        <%= new Date(appointment.date).toLocaleDateString() %><br>
+                                        <span class="time"><%= appointment.time %></span>
+                                    </div>
+                                    <div>
+                                        <span class="status status-<%= appointment.status %>">
+                                            <%= appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1) %>
+                                        </span>
+                                    </div>
+                                    <div class="note-cell"><%= appointment.note %></div>
+                                </div>
+                            <% }); %>
+                        </div>
+                    <% } else { %>
+                        <div class="empty-state">
+                            <p>No appointments found. Book your first appointment with a teacher!</p>
+                        </div>
+                    <% } %>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <!-- Booking Modal -->
+    <div id="bookingModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeBookingModal()">&times;</span>
+            <h2>Book Appointment</h2>
+            <form action="/student/book-appointment" method="POST" class="booking-form">
+                <input type="hidden" id="teacherId" name="teacherId">
+                
+                <div class="form-group">
+                    <label>Teacher:</label>
+                    <div id="teacherInfo" class="teacher-display"></div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="date">Preferred Date:</label>
+                    <input type="date" id="date" name="date" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="time">Preferred Time:</label>
+                    <select id="time" name="time" required>
+                        <option value="">Select time</option>
+                        <option value="09:00">9:00 AM</option>
+                        <option value="10:00">10:00 AM</option>
+                        <option value="11:00">11:00 AM</option>
+                        <option value="14:00">2:00 PM</option>
+                        <option value="15:00">3:00 PM</option>
+                        <option value="16:00">4:00 PM</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="note">Request Note:</label>
+                    <textarea id="note" name="note" required maxlength="500" 
+                              placeholder="Please describe what you'd like to discuss..."></textarea>
+                </div>
+                
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-outline" onclick="closeBookingModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Send Request</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/client.js"></script>
+    <script>
+        // Set minimum date to today
+        document.getElementById('date').min = new Date().toISOString().split('T')[0];
+        
+        function openBookingModal(teacherId, teacherName, subject) {
+            document.getElementById('teacherId').value = teacherId;
+            document.getElementById('teacherInfo').innerHTML = `<strong>${teacherName}</strong><br><em>${subject}</em>`;
+            document.getElementById('bookingModal').style.display = 'block';
+        }
+        
+        function closeBookingModal() {
+            document.getElementById('bookingModal').style.display = 'none';
+        }
+        
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('bookingModal');
+            if (event.target == modal) {
+                closeBookingModal();
+            }
+        }
+    </script>
+</body>
+</html>
